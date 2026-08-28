@@ -1,0 +1,1184 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>人格卡生成工具 · SillyTavern V2</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          ink:   { 900: '#16161d', 700: '#3b3b46', 500: '#6b6b7b', 300: '#a8a8b8' },
+          brand: { 50:'#f2f0ff', 100:'#e6e2ff', 200:'#cfc7ff', 400:'#8b7cf6', 500:'#6d5ce7', 600:'#5a48d6', 700:'#4a39b8' },
+        },
+        boxShadow: {
+          soft: '0 1px 2px rgba(16,16,28,.04), 0 8px 24px -12px rgba(16,16,28,.14)',
+        }
+      }
+    }
+  }
+</script>
+<style>
+  html { -webkit-font-smoothing: antialiased; }
+  body { font-family: "PingFang SC", "Microsoft YaHei", "Helvetica Neue", system-ui, sans-serif; }
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-thumb { background: #d7d7e3; border-radius: 8px; }
+  ::-webkit-scrollbar-thumb:hover { background: #bdbdd0; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  .bubble { word-break: break-word; white-space: pre-wrap; }
+  pre code { font-family: "JetBrains Mono", "Cascadia Code", Consolas, monospace; }
+  .fade-in { animation: fade .28s ease both; }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+</style>
+</head>
+
+<body class="bg-slate-50 text-ink-900 min-h-screen">
+
+<!-- ============ 顶部区域 ============ -->
+<header class="sticky top-0 z-30 bg-white/85 backdrop-blur border-b border-slate-200">
+  <div class="max-w-[1400px] mx-auto px-5 py-3.5 flex flex-col md:flex-row md:items-center gap-3 md:gap-6">
+    <div class="flex items-center gap-2.5 shrink-0">
+      <div class="w-9 h-9 rounded-xl bg-gradient-to-br from-brand-400 to-brand-600 grid place-items-center shadow-soft">
+        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4 5.5A2.5 2.5 0 016.5 3H18a2 2 0 012 2v14a2 2 0 01-2 2H6.5A2.5 2.5 0 014 18.5v-13z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M8 8h8M8 12h8M8 16h5"/>
+        </svg>
+      </div>
+      <div>
+        <h1 class="text-[17px] font-semibold leading-tight">人格卡生成工具</h1>
+        <p class="text-[11.5px] text-ink-300 leading-tight">聊天记录 → SillyTavern V2 人格卡</p>
+      </div>
+    </div>
+
+    <div class="flex-1"></div>
+
+    <div class="flex items-center gap-2 w-full md:w-auto">
+      <div class="relative flex-1 md:w-80">
+        <svg class="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-ink-300" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+        </svg>
+        <input id="apiKey" type="password" placeholder="请输入 DeepSeek API Key"
+          class="w-full pl-9 pr-3 py-2 text-[13px] rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none transition">
+      </div>
+      <button id="btnTest" type="button"
+        class="shrink-0 px-3.5 py-2 text-[13px] font-medium rounded-lg border border-slate-200 bg-white text-ink-700 hover:border-brand-400 hover:text-brand-600 transition disabled:opacity-50">
+        测试连接
+      </button>
+      <button id="btnExport" type="button"
+        class="shrink-0 px-3.5 py-2 text-[13px] font-medium rounded-lg border border-slate-200 bg-white text-ink-700 hover:border-brand-400 hover:text-brand-600 transition">
+        📦 导出项目
+      </button>
+      <button id="btnImport" type="button"
+        class="shrink-0 px-3.5 py-2 text-[13px] font-medium rounded-lg border border-slate-200 bg-white text-ink-700 hover:border-brand-400 hover:text-brand-600 transition">
+        📥 导入项目
+      </button>
+      <input id="importFile" type="file" accept=".zip" class="hidden">
+    </div>
+  </div>
+  <div class="max-w-[1400px] mx-auto px-5 pb-2.5 -mt-1">
+    <div class="flex items-start justify-between gap-3">
+      <p class="text-[11px] text-ink-300">API Key 仅保存在当前页面（不写入数据库、不上传第三方），每次请求时随请求携带。</p>
+      <button id="btnPrivacyToggle" type="button"
+        class="shrink-0 flex items-center gap-1 text-[11px] text-ink-500 hover:text-brand-600 transition select-none">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+        </svg>
+        导出隐私设置
+        <span id="privacyCaret" class="text-[9px] transition-transform">▼</span>
+      </button>
+    </div>
+
+    <!-- 可折叠：导出隐私设置 -->
+    <div id="privacyPanel" class="hidden mt-2 rounded-xl border border-slate-200 bg-white p-3.5">
+      <label for="excludeWords" class="block text-[12px] font-medium text-ink-700 mb-1.5">导出时需屏蔽的敏感词，每行一个</label>
+      <textarea id="excludeWords" rows="3"
+        placeholder="每行一个敏感词，如：张伟 朝阳区 腾讯"
+        class="w-full px-3 py-2 text-[12.5px] rounded-lg border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none transition resize-y leading-relaxed"></textarea>
+      <p class="mt-1.5 text-[11px] text-ink-300 leading-relaxed">
+        导出时这些词会被替换为 <code class="px-1 rounded bg-slate-100 text-ink-500">[隐私]</code>；
+        手机号、身份证号、邮箱、IP 地址会自动替换为 <code class="px-1 rounded bg-slate-100 text-ink-500">[个人信息]</code>。
+        清洗只在导出时生效，不会改动数据库中的原始记录；词表保存在本机浏览器，不会随导出包外传。
+      </p>
+    </div>
+  </div>
+</header>
+
+<!-- ============ 主体 ============ -->
+<main class="max-w-[1400px] mx-auto px-5 py-6 grid grid-cols-1 lg:grid-cols-12 gap-5 items-start">
+
+  <!-- ---------- 左侧：上传与管理 ---------- -->
+  <section class="lg:col-span-5 space-y-5">
+
+    <!-- 上传卡片 -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+      <h2 class="text-[14px] font-semibold mb-3.5 flex items-center gap-2">
+        <span class="w-1.5 h-4 rounded-full bg-brand-500"></span>上传聊天记录
+      </h2>
+      <p class="text-[11.5px] text-ink-300 leading-relaxed mb-3.5">
+        提示：聊天样本越多，生成的人格卡越接近对话中的说话风格；但请注意，本工具仅还原「对话文本中的角色画像」，与现实中真实的人格并无对应关系。
+      </p>
+
+      <!-- 标签切换 -->
+      <div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl mb-4">
+        <button data-tab="file" class="tab-btn active text-[13px] font-medium py-2 rounded-lg transition">文件上传</button>
+        <button data-tab="paste" class="tab-btn text-[13px] font-medium py-2 rounded-lg transition">文本粘贴</button>
+      </div>
+
+      <!-- 文件上传 -->
+      <div id="pane-file" class="tab-pane space-y-3">
+        <label class="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-slate-200 rounded-xl py-7 cursor-pointer hover:border-brand-400 hover:bg-brand-50/40 transition">
+          <svg class="w-7 h-7 text-ink-300" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9m0 0L9 12m3-3l3 3M6.75 19.5h10.5a3.75 3.75 0 00.28-7.49A5.25 5.25 0 007.2 9.2 3.75 3.75 0 006.75 19.5z"/>
+          </svg>
+          <span id="fileName" class="text-[13px] text-ink-500">点击选择 .txt 文件</span>
+          <input id="fileInput" type="file" accept=".txt,.text,text/plain" class="hidden">
+        </label>
+        <button id="btnUploadFile" type="button"
+          class="w-full py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-[13.5px] font-medium shadow-sm transition disabled:opacity-50">
+          上传文件
+        </button>
+      </div>
+
+      <!-- 文本粘贴 -->
+      <div id="pane-paste" class="tab-pane hidden space-y-3">
+        <textarea id="pasteArea" rows="9"
+          placeholder="风碎逝&#10;2026年08月28日 19:30&#10;什么时候回&#10;&#10;拾柒&#10;2026年08月28日 19:32&#10;我在家"
+          class="w-full px-3.5 py-3 text-[13px] leading-relaxed rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none resize-y transition"></textarea>
+        <button id="btnUploadPaste" type="button"
+          class="w-full py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-[13.5px] font-medium shadow-sm transition disabled:opacity-50">
+          粘贴上传
+        </button>
+        <p class="text-[11.5px] text-ink-300">点击后文本框将自动清空，便于粘贴下一段内容。</p>
+      </div>
+    </div>
+
+    <!-- 历史卡片 -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+      <div class="flex items-center justify-between mb-3.5">
+        <h2 class="text-[14px] font-semibold flex items-center gap-2">
+          <span class="w-1.5 h-4 rounded-full bg-brand-500"></span>上传历史
+        </h2>
+        <span id="historyTotal" class="text-[11.5px] text-ink-300">共 0 条 / 0 条消息</span>
+      </div>
+
+      <div id="historyList" class="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+        <div class="py-8 text-center text-[13px] text-ink-300">暂无记录，先上传一段聊天记录吧</div>
+      </div>
+
+      <!-- 数据量提示（超过阈值时出现） -->
+      <div id="storageWarn" class="hidden mt-3 flex items-start gap-2 rounded-lg bg-amber-50 border border-amber-200 px-3 py-2">
+        <svg class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.7 3.86a2 2 0 00-3.4 0z"/>
+        </svg>
+        <p class="text-[11.5px] text-amber-700 leading-relaxed">数据量较大，建议清理 7 天前数据以提升性能。</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 mt-4 pt-4 border-t border-slate-100">
+        <button id="btnDeleteLast" type="button"
+          class="py-2 rounded-xl border border-slate-200 text-[12.5px] font-medium text-ink-700 hover:border-amber-400 hover:text-amber-600 transition disabled:opacity-40">
+          删除上次上传
+        </button>
+        <button id="btnDeleteAll" type="button"
+          class="py-2 rounded-xl border border-slate-200 text-[12.5px] font-medium text-ink-700 hover:border-rose-400 hover:text-rose-600 transition disabled:opacity-40">
+          删除所有内容
+        </button>
+      </div>
+
+      <button id="btnCleanup" type="button"
+        class="w-full mt-2 py-2 rounded-xl border border-slate-200 text-[12.5px] font-medium text-ink-700 hover:border-amber-500 hover:text-amber-600 hover:bg-amber-50 transition disabled:opacity-40">
+        🗑️ 清理 7 天前数据
+      </button>
+      <p class="mt-1.5 text-[11px] text-ink-300 leading-relaxed">
+        当前数据库共存储 <span id="dbMessageCount" class="text-ink-500">0</span> 条消息。清理只删除上传记录与关联消息，<span class="text-ink-500">已生成的人格卡不受影响</span>。
+      </p>
+    </div>
+  </section>
+
+    <!-- 数据健康度 -->
+    <div id="healthCard" class="hidden bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+      <div class="flex items-center justify-between mb-3.5">
+        <h2 class="text-[14px] font-semibold flex items-center gap-2">
+          <span class="w-1.5 h-4 rounded-full bg-brand-500"></span>数据健康度
+        </h2>
+        <span id="healthGrade" class="text-[13px] font-bold px-2.5 py-1 rounded-full"></span>
+      </div>
+      <p class="text-[11.5px] text-ink-300 mb-3.5">基于最近一次上传的对话块评估，用于判断样本是否足够还原角色。</p>
+      <div class="space-y-3">
+        <div>
+          <div class="flex justify-between text-[12px] text-ink-500 mb-1">
+            <span>有效消息占比</span><span id="healthValid">—</span>
+          </div>
+          <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div id="barValid" class="h-full bg-brand-500" style="width:0"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[12px] text-ink-500 mb-1">
+            <span>轮次交替率</span><span id="healthAlt">—</span>
+          </div>
+          <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div id="barAlt" class="h-full bg-brand-500" style="width:0"></div></div>
+        </div>
+        <div>
+          <div class="flex justify-between text-[12px] text-ink-500 mb-1">
+            <span>平均消息长度</span><span id="healthLen">—</span>
+          </div>
+          <div class="h-2 rounded-full bg-slate-100 overflow-hidden"><div id="barLen" class="h-full bg-brand-500" style="width:0"></div></div>
+        </div>
+      </div>
+      <p id="healthScore" class="mt-3.5 text-[12px] text-ink-700"></p>
+    </div>
+  </section>
+
+  <!-- ---------- 右侧：预览与生成 ---------- -->
+  <section class="lg:col-span-7 space-y-5">
+
+    <!-- 昵称映射 -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+      <h2 class="text-[14px] font-semibold mb-3.5 flex items-center gap-2">
+        <span class="w-1.5 h-4 rounded-full bg-brand-500"></span>昵称映射
+      </h2>
+      <div class="grid grid-cols-1 sm:grid-cols-[1fr_auto_1fr] gap-3 items-end">
+        <div>
+          <label class="block text-[12px] text-ink-500 mb-1.5">User（你）</label>
+          <input id="userNick" type="text" placeholder="自动检测"
+            class="w-full px-3.5 py-2.5 text-[13px] rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none transition">
+        </div>
+        <button id="btnSwap" type="button" title="互换"
+          class="h-[42px] w-full sm:w-11 rounded-xl border border-slate-200 grid place-items-center hover:border-brand-400 hover:text-brand-600 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-9L21 12m0 0l-4.5 4.5M21 12H7.5"/>
+          </svg>
+        </button>
+        <div>
+          <label class="block text-[12px] text-ink-500 mb-1.5">Char（她/他）</label>
+          <input id="charNick" type="text" placeholder="自动检测"
+            class="w-full px-3.5 py-2.5 text-[13px] rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none transition">
+        </div>
+      </div>
+      <p id="nickHint" class="mt-2.5 text-[11.5px] text-ink-300"></p>
+    </div>
+
+    <!-- 对话预览 -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+      <div class="flex items-center justify-between mb-3.5">
+        <h2 class="text-[14px] font-semibold flex items-center gap-2">
+          <span class="w-1.5 h-4 rounded-full bg-brand-500"></span>对话预览
+        </h2>
+        <span id="previewCount" class="text-[11.5px] text-ink-300">0 条</span>
+      </div>
+      <div id="preview" class="space-y-2.5 max-h-[360px] overflow-y-auto pr-1 bg-slate-50/60 rounded-xl p-3.5">
+        <div class="py-8 text-center text-[13px] text-ink-300">暂无对话内容</div>
+      </div>
+    </div>
+
+    <!-- 生成 -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+      <!-- 评估模式 -->
+      <div class="mb-4">
+        <div class="flex items-center justify-between mb-2">
+          <span class="text-[12.5px] font-medium text-ink-700">评估模式</span>
+        </div>
+        <div id="modeGroup" class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl">
+          <button data-mode="fast" class="mode-btn text-[13px] font-medium py-2 rounded-lg transition bg-white shadow-sm text-brand-600">快速模式</button>
+          <button data-mode="strict" class="mode-btn text-[13px] font-medium py-2 rounded-lg transition text-ink-500" title="留出 10% 数据做独立验证">严谨模式</button>
+        </div>
+        <p id="modeHint" class="mt-2 text-[11.5px] text-ink-300"></p>
+      </div>
+
+      <button id="btnGenerate" type="button"
+        class="w-full py-3 rounded-xl bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white text-[14px] font-semibold shadow-sm transition disabled:opacity-50 flex items-center justify-center gap-2">
+        <span id="genIcon">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9.8 4.6A2 2 0 0113.4 6l.3 4.2 4.2.3a2 2 0 011.4 3.6l-3.2 2.8 1 4.2a2 2 0 01-3 2.2l-3.7-2.2-3.7 2.2a2 2 0 01-3-2.2l1-4.2L1.5 14a2 2 0 011.4-3.6l4.2-.3.3-4.2a2 2 0 012.4-1.3z"/>
+          </svg>
+        </span>
+        <span id="genText">生成人格卡</span>
+      </button>
+
+      <div id="resultWrap" class="hidden mt-4">
+        <div class="flex items-center justify-between gap-3 mb-2 flex-wrap">
+          <div class="flex items-center gap-2">
+            <span class="text-[12.5px] font-medium text-ink-700">生成结果</span>
+            <span id="resultBadge" class="hidden text-[11px] px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200">chara_card_v2</span>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="exportFormat" class="text-[12.5px] rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 outline-none focus:border-brand-400 cursor-pointer">
+              <option value="sillytavern">SillyTavern JSON（完整）</option>
+              <option value="text">纯文本提示词版</option>
+              <option value="simple">简化 JSON 版</option>
+            </select>
+            <button id="btnCopy" type="button" class="px-3 py-1.5 text-[12.5px] rounded-lg border border-slate-200 hover:border-brand-400 hover:text-brand-600 transition">复制</button>
+            <button id="btnDownload" type="button" class="px-3 py-1.5 text-[12.5px] rounded-lg border border-slate-200 hover:border-brand-400 hover:text-brand-600 transition">下载</button>
+          </div>
+        </div>
+        <pre id="resultJson" class="max-h-[420px] overflow-auto bg-ink-900 text-slate-100 text-[12px]  leading-relaxed rounded-xl p-4"><code></code></pre>
+
+        <button id="btnHistoryCards" type="button"
+          class="hidden mt-2 text-[12px] text-brand-600 hover:text-brand-700 underline underline-offset-2">查看历史卡片（0）</button>
+
+        <!-- 人格保真度 -->
+        <div id="fidelityCard" class="hidden mt-4 flex items-center gap-4 rounded-xl border border-slate-200 p-4">
+          <div id="fidelityRing" class="shrink-0 w-16 h-16 rounded-full grid place-items-center text-white text-[18px] font-bold">—</div>
+          <div class="min-w-0">
+            <div class="text-[13px] font-semibold text-ink-700">人格保真度</div>
+            <div id="fidelityVerdict" class="mt-0.5 text-[12px] text-ink-500">等待评估…</div>
+          </div>
+        </div>
+        <div id="fidelityDetail" class="hidden mt-3 space-y-2"></div>
+      </div>
+    </div>
+    <!-- 试聊 -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-soft p-5">
+      <h2 class="text-[14px] font-semibold mb-1 flex items-center gap-2">
+        <span class="w-1.5 h-4 rounded-full bg-brand-500"></span>试聊
+      </h2>
+      <p class="text-[11.5px] text-ink-300 mb-3.5">基于已生成的人格卡角色设定进行对话。聊天记录仅保留在当前页面，刷新即清空，不会写入数据库。</p>
+      <div id="chatBox" class="space-y-2.5 max-h-[320px] overflow-y-auto pr-1 bg-slate-50/60 rounded-xl p-3.5 mb-3">
+        <div class="py-6 text-center text-[13px] text-ink-300">生成人格卡后，即可在此与角色对话</div>
+      </div>
+      <div class="flex gap-2">
+        <input id="chatInput" type="text" placeholder="向角色说点什么…"
+          class="flex-1 px-3.5 py-2.5 text-[13px] rounded-xl border border-slate-200 bg-slate-50 focus:bg-white focus:border-brand-400 focus:ring-2 focus:ring-brand-100 outline-none transition">
+        <button id="btnChat" type="button"
+          class="shrink-0 px-4 py-2.5 rounded-xl bg-brand-500 hover:bg-brand-600 text-white text-[13.5px] font-medium transition disabled:opacity-50">发送</button>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- ============ 确认弹窗 ============ -->
+<div id="confirmModal" class="hidden fixed inset-0 z-50 bg-ink-900/40 backdrop-blur-sm grid place-items-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl fade-in">
+    <div class="w-11 h-11 rounded-full bg-rose-50 grid place-items-center mb-3.5">
+      <svg class="w-5 h-5 text-rose-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.7 3.86a2 2 0 00-3.4 0z"/>
+      </svg>
+    </div>
+    <h3 class="text-[15px] font-semibold mb-1.5">确认删除所有内容？</h3>
+    <p class="text-[13px] text-ink-500 leading-relaxed">将清空数据库中的全部上传记录与对话数据，此操作不可恢复。</p>
+    <div class="flex gap-2.5 mt-5">
+      <button id="confirmCancel" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-[13px] font-medium hover:bg-slate-50 transition">取消</button>
+      <button id="confirmOk" class="flex-1 py-2.5 rounded-xl bg-rose-500 hover:bg-rose-600 text-white text-[13px] font-medium transition">确认删除</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 通用确认弹窗（导出/导入） ============ -->
+<div id="dlgModal" class="hidden fixed inset-0 z-50 bg-ink-900/40 backdrop-blur-sm grid place-items-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-sm p-6 shadow-xl fade-in">
+    <div class="w-11 h-11 rounded-full bg-amber-50 grid place-items-center mb-3.5">
+      <svg class="w-5 h-5 text-amber-500" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.3 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.7 3.86a2 2 0 00-3.4 0z"/>
+      </svg>
+    </div>
+    <h3 id="dlgTitle" class="text-[15px] font-semibold mb-1.5">确认操作</h3>
+    <p id="dlgBody" class="text-[13px] text-ink-500 leading-relaxed">请确认。</p>
+    <div class="flex gap-2.5 mt-5">
+      <button id="dlgCancel" class="flex-1 py-2.5 rounded-xl border border-slate-200 text-[13px] font-medium hover:bg-slate-50 transition">取消</button>
+      <button id="dlgOk" class="flex-1 py-2.5 rounded-xl text-[13px] font-medium text-white transition bg-brand-500 hover:bg-brand-600">确认</button>
+    </div>
+  </div>
+</div>
+
+<!-- ============ 历史卡片弹窗 ============ -->
+<div id="cardsModal" class="hidden fixed inset-0 z-50 bg-ink-900/40 backdrop-blur-sm grid place-items-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-lg p-6 shadow-xl fade-in">
+    <div class="flex items-center justify-between mb-1">
+      <h3 class="text-[15px] font-semibold">历史人格卡</h3>
+      <button id="cardsClose" type="button" class="text-ink-300 hover:text-ink-700 text-[20px] leading-none px-1">×</button>
+    </div>
+    <p class="text-[12px] text-ink-300 mb-3.5">已生成的人格卡保存在本地数据库，重启工具不会丢失；导出项目时打包的是最新的一张。</p>
+    <div id="cardsList" class="max-h-[380px] overflow-auto space-y-2"></div>
+  </div>
+</div>
+
+<!-- ============ Toast ============ -->
+<div id="toast" class="hidden fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-xl shadow-lg text-[13px] font-medium fade-in"></div>
+
+<script>
+(() => {
+  'use strict';
+
+  const $ = (id) => document.getElementById(id);
+  const state = { messages: [], nicks: [], card: null, cardId: null, mode: 'fast', holdoutIds: [] };
+
+  /* ---------------- Toast ---------------- */
+  let toastTimer = null;
+
+  /** 把秒数说成人话：45 → 45 秒；150 → 3 分钟；7200 → 2 小时 */
+  function humanWait(sec) {
+    const s = Math.max(1, Math.round(Number(sec) || 60));
+    if (s < 60) return `${s} 秒`;
+    if (s < 3600) return `${Math.ceil(s / 60)} 分钟`;
+    return `${Math.ceil(s / 3600)} 小时`;
+  }
+
+  function rateLimitMessage(retryAfter) {
+    return `操作太频繁，请等待 ${humanWait(retryAfter)}后再试`;
+  }
+  function toast(msg, type = 'info') {
+    const el = $('toast');
+    const styles = {
+      info:    'bg-ink-900 text-white',
+      success: 'bg-emerald-600 text-white',
+      error:   'bg-rose-600 text-white',
+      warn:    'bg-amber-500 text-white',
+    };
+    el.className = `fixed top-4 left-1/2 -translate-x-1/2 z-[60] px-4 py-2.5 rounded-xl shadow-lg text-[13px] font-medium fade-in ${styles[type] || styles.info}`;
+    el.textContent = msg;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => el.classList.add('hidden'), 3000);
+  }
+
+  async function api(url, options = {}) {
+    const res = await fetch(url, {
+      headers: { 'Content-Type': 'application/json' },
+      ...options,
+    });
+    let data = {};
+    try { data = await res.json(); } catch { /* ignore */ }
+    // 限流：把后端给的 retry_after 直接转成可读提示
+    if (res.status === 429) {
+      throw new Error(rateLimitMessage(data && data.retry_after));
+    }
+    if (!res.ok) {
+      throw new Error(data.error || `请求失败 (${res.status})`);
+    }
+    return data;
+  }
+
+  /* ---------------- 通用确认弹窗 ---------------- */
+  function dialog(title, body, okText, danger = false) {
+    return new Promise((resolve) => {
+      const m = $('dlgModal');
+      $('dlgTitle').textContent = title;
+      $('dlgBody').textContent = body;
+      const ok = $('dlgOk');
+      ok.textContent = okText;
+      ok.className = `flex-1 py-2.5 rounded-xl text-[13px] font-medium text-white transition ${danger ? 'bg-rose-500 hover:bg-rose-600' : 'bg-brand-500 hover:bg-brand-600'}`;
+      const done = (v) => { m.classList.add('hidden'); resolve(v); };
+      $('dlgCancel').onclick = () => done(false);
+      ok.onclick = () => done(true);
+      m.onclick = (e) => { if (e.target === m) done(false); };
+      m.classList.remove('hidden');
+    });
+  }
+
+  /* ---------------- 导出隐私设置（可折叠） ---------------- */
+  const EW_KEY = 'cc_exclude_words';
+  try { $('excludeWords').value = localStorage.getItem(EW_KEY) || ''; } catch { /* 隐私模式下不可用 */ }
+  $('excludeWords').addEventListener('change', () => {
+    try { localStorage.setItem(EW_KEY, $('excludeWords').value); } catch { /* ignore */ }
+  });
+  $('btnPrivacyToggle').addEventListener('click', () => {
+    const panel = $('privacyPanel');
+    const open = panel.classList.toggle('hidden') === false;
+    $('privacyCaret').style.transform = open ? 'rotate(180deg)' : '';
+    if (open) $('excludeWords').focus();
+  });
+
+  function getExcludeWords() {
+    return $('excludeWords').value.split('\n').map((s) => s.trim()).filter(Boolean);
+  }
+
+  /* ---------------- 历史人格卡 ---------------- */
+  async function refreshCardCount() {
+    try {
+      const data = await api('/cards');
+      const n = (data.cards || []).length;
+      const btn = $('btnHistoryCards');
+      btn.textContent = `查看历史卡片（${n}）`;
+      btn.classList.remove('hidden');
+    } catch { /* 静默失败，不打断主流程 */ }
+  }
+
+  async function openCards() {
+    const box = $('cardsList');
+    box.innerHTML = '<div class="py-8 text-center text-[13px] text-ink-300">加载中…</div>';
+    $('cardsModal').classList.remove('hidden');
+    try {
+      const data = await api('/cards');
+      const list = data.cards || [];
+      if (!list.length) {
+        box.innerHTML = '<div class="py-8 text-center text-[13px] text-ink-300">还没有生成过人格卡</div>';
+        return;
+      }
+      box.innerHTML = list.map((c) => `
+        <div class="flex items-center gap-2.5 rounded-xl border border-slate-200 p-3">
+          <div class="min-w-0 flex-1">
+            <div class="text-[13px] font-medium text-ink-700 truncate">${escapeHtml(c.card_name || '未命名角色')}</div>
+            <div class="text-[11px] text-ink-300 mt-0.5">
+              ${escapeHtml(c.created_at || '')}
+              · ${c.mode === 'strict' ? '严谨模式' : c.mode === 'fast' ? '快速模式' : '导入/独立生成'}
+              ${c.evaluation_score != null ? ` · 保真度 ${c.evaluation_score}` : ''}
+              ${c.upload_session_id ? ` · 批次 #${c.upload_session_id}` : ''}
+            </div>
+          </div>
+          <button data-load="${c.id}" type="button" class="shrink-0 px-2.5 py-1.5 text-[12px] rounded-lg border border-slate-200 hover:border-brand-400 hover:text-brand-600 transition">载入</button>
+          <button data-del="${c.id}" type="button" class="shrink-0 px-2.5 py-1.5 text-[12px] rounded-lg border border-slate-200 text-rose-500 hover:border-rose-300 transition">删除</button>
+        </div>`).join('');
+      box.querySelectorAll('[data-load]').forEach((b) => b.addEventListener('click', () => loadCard(+b.dataset.load)));
+      box.querySelectorAll('[data-del]').forEach((b) => b.addEventListener('click', () => removeCard(+b.dataset.del)));
+    } catch (err) {
+      box.innerHTML = `<div class="py-8 text-center text-[13px] text-rose-500">${escapeHtml(err.message)}</div>`;
+    }
+  }
+
+  async function loadCard(id) {
+    try {
+      const data = await api('/cards/' + id);
+      state.card = data.card;
+      state.cardId = data.id || null;
+      $('resultWrap').classList.remove('hidden');
+      $('resultBadge').classList.remove('hidden');
+      $('exportFormat').value = 'sillytavern';
+      await renderExport();
+      $('cardsModal').classList.add('hidden');
+      toast('已载入历史卡片', 'success');
+      $('resultWrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  async function removeCard(id) {
+    const ok = await dialog('删除这张人格卡？', '删除后无法恢复，聊天记录不受影响。是否继续？', '确认删除', true);
+    if (!ok) return;
+    try {
+      await api('/cards/' + id, { method: 'DELETE' });
+      toast('已删除', 'success');
+      await Promise.all([openCards(), refreshCardCount()]);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  $('btnHistoryCards').addEventListener('click', openCards);
+  $('cardsClose').addEventListener('click', () => $('cardsModal').classList.add('hidden'));
+  $('cardsModal').addEventListener('click', (e) => { if (e.target === $('cardsModal')) $('cardsModal').classList.add('hidden'); });
+
+  /* ---------------- 导出 / 导入项目 ---------------- */
+  $('btnExport').addEventListener('click', async () => {
+    const key = $('apiKey').value.trim();
+    const words = getExcludeWords();
+    const ok = await dialog(
+      '导出项目',
+      `导出内容将做两层清洗：昵称替换为“我/她”；手机号、身份证号、邮箱、IP 地址替换为 [个人信息]${words.length ? `；你填写的 ${words.length} 个自定义敏感词替换为 [隐私]` : ''}。清洗只在导出副本上生效，不改动数据库原文。请确认已获得相关数据所有人的授权。是否继续？`,
+      '确认导出'
+    );
+    if (!ok) return;
+    try {
+      toast('正在打包…', 'info');
+      const resp = await fetch('/export_project', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: key, exclude_words: words }),
+      });
+      if (!resp.ok) {
+        const e = await resp.json().catch(() => ({}));
+        if (resp.status === 429) throw new Error(rateLimitMessage(e.retry_after));
+        throw new Error(e.error || '导出失败');
+      }
+      const blob = await resp.blob();
+      const ts = new Date().toISOString().replace(/[:.]/g, '-');
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = `project_${ts}.zip`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+      toast('已导出项目压缩包', 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+
+  $('btnImport').addEventListener('click', () => $('importFile').click());
+  $('importFile').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    e.target.value = '';
+    if (!file) return;
+    const ok = await dialog(
+      '导入项目',
+      '导入项目将清空当前所有数据（包括上传历史和生成的人格卡），此操作不可逆。请确认已备份当前数据。是否继续？',
+      '确认导入',
+      true
+    );
+    if (!ok) return;
+    const fd = new FormData();
+    fd.append('file', file);
+    try {
+      toast('正在导入…', 'info');
+      const raw = await fetch('/import_project', { method: 'POST', body: fd });
+      const data = await raw.json().catch(() => ({}));
+      if (raw.status === 429) throw new Error(rateLimitMessage(data.retry_after));
+      if (!data.success) throw new Error(data.error || '导入失败');
+      if (data.warning) toast(data.warning, 'warn');
+      state.card = data.card || null;
+      state.cardId = data.card_id || null;
+      if (data.card) {
+        $('resultWrap').classList.remove('hidden');
+        $('resultBadge').classList.remove('hidden');
+        $('exportFormat').value = 'sillytavern';
+        await renderExport();
+      }
+      await Promise.all([loadHistory(), loadMerge(), refreshCardCount()]);
+      toast(`已导入 ${data.records} 条记录、${data.messages} 条消息、${data.cards} 张人格卡`, 'success');
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+
+  /* ---------------- 标签切换 ---------------- */
+  document.querySelectorAll('.tab-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach((b) => {
+        const on = b === btn;
+        b.classList.toggle('active', on);
+        b.classList.toggle('bg-white', on);
+        b.classList.toggle('shadow-sm', on);
+        b.classList.toggle('text-brand-600', on);
+        b.classList.toggle('text-ink-500', !on);
+      });
+      const tab = btn.dataset.tab;
+      $('pane-file').classList.toggle('hidden', tab !== 'file');
+      $('pane-paste').classList.toggle('hidden', tab !== 'paste');
+    });
+  });
+  document.querySelector('.tab-btn').click();
+
+  /* ---------------- 评估模式（Fast / Strict） ---------------- */
+  function syncModeUI() {
+    document.querySelectorAll('.mode-btn').forEach((b) => {
+      const on = b.dataset.mode === state.mode;
+      b.classList.toggle('bg-white', on);
+      b.classList.toggle('shadow-sm', on);
+      b.classList.toggle('text-brand-600', on);
+      b.classList.toggle('text-ink-500', !on);
+    });
+    $("modeHint").textContent = state.mode === 'strict'
+      ? '将随机留出 10% 数据用于独立验证，评估分数更具统计可信度。数据量需 ≥ 50 条有效消息。'
+      : '使用全部数据生成，评估分仅供参考，建议数据量 > 50 条时切换至严谨模式。';
+  }
+  function refreshModeAvailability() {
+    const enough = (state.messages || []).length >= 50;
+    const strictBtn = document.querySelector('[data-mode="strict"]');
+    strictBtn.disabled = !enough;
+    strictBtn.classList.toggle('opacity-40', !enough);
+    strictBtn.title = enough ? '留出 10% 数据做独立验证' : '当前数据量不足 50 条，严谨模式不可用';
+    if (!enough && state.mode === 'strict') {
+      state.mode = 'fast';
+      syncModeUI();
+    }
+  }
+  document.querySelectorAll('.mode-btn').forEach((btn) => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      state.mode = btn.dataset.mode;
+      syncModeUI();
+    });
+  });
+
+  /* ---------------- API Key 测试 ---------------- */
+  $('btnTest').addEventListener('click', async () => {
+    const key = $('apiKey').value.trim();
+    if (!key) return toast('请先输入 API Key', 'warn');
+    const btn = $('btnTest');
+    btn.disabled = true; btn.textContent = '测试中…';
+    try {
+      const data = await api('/test_api', { method: 'POST', body: JSON.stringify({ api_key: key }) });
+      if (data.valid) toast('连接成功，API Key 有效', 'success');
+      else toast(data.error || '连接失败', 'error');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '测试连接';
+    }
+  });
+
+  /* ---------------- 文件上传 ---------------- */
+  let pickedFile = null;
+  $('fileInput').addEventListener('change', (e) => {
+    pickedFile = e.target.files[0] || null;
+    $('fileName').textContent = pickedFile ? pickedFile.name : '点击选择 .txt 文件';
+    $('fileName').classList.toggle('text-brand-600', !!pickedFile);
+  });
+
+  $('btnUploadFile').addEventListener('click', async () => {
+    if (!pickedFile) return toast('请先选择文件', 'warn');
+    const btn = $('btnUploadFile');
+    btn.disabled = true; btn.textContent = '上传中…';
+    try {
+      const content = await pickedFile.text();
+      await doUpload('file', content, pickedFile.name);
+      pickedFile = null;
+      $('fileInput').value = '';
+      $('fileName').textContent = '点击选择 .txt 文件';
+      $('fileName').classList.remove('text-brand-600');
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '上传文件';
+    }
+  });
+
+  /* ---------------- 粘贴上传 ---------------- */
+  $('btnUploadPaste').addEventListener('click', async () => {
+    const content = $('pasteArea').value;
+    if (!content.trim()) return toast('请粘贴聊天记录内容', 'warn');
+    const btn = $('btnUploadPaste');
+    btn.disabled = true; btn.textContent = '上传中…';
+    try {
+      await doUpload('paste', content, '');
+      $('pasteArea').value = '';
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false; btn.textContent = '粘贴上传';
+    }
+  });
+
+  async function doUpload(type, content, fileName) {
+    const data = await api('/upload', {
+      method: 'POST',
+      body: JSON.stringify({ upload_type: type, content, file_name: fileName }),
+    });
+    if (data.warning) toast(data.warning, 'warn');
+    else toast(`解析成功：${data.message_count} 条消息`, 'success');
+    if (data.extra_nicks) toast('检测到 2 个以上昵称，已取出现频率最高的两个', 'warn');
+    if (data.score) showHealth(data.score);
+    if (data.score && data.score.score < 60) {
+      toast('当前数据质量较低，生成的人格卡可能失真，建议补充更丰富的日常对话。', 'error');
+    }
+    await Promise.all([loadHistory(), loadMerge()]);
+  }
+
+  /* ---------------- 历史列表 ---------------- */
+  function fmtTime(s) {
+    if (!s) return '';
+    return String(s).replace('T', ' ').slice(5, 19);
+  }
+
+  async function loadHistory() {
+    const data = await api('/history');
+    const list = $('historyList');
+    const items = data.items || [];
+    const total = items.reduce((sum, it) => sum + (it.message_count || 0), 0);
+    $('historyTotal').textContent = `共 ${items.length} 条 / ${total} 条消息`;
+    $('btnDeleteLast').disabled = items.length === 0;
+    $('btnDeleteAll').disabled = items.length === 0;
+    $('btnCleanup').disabled = items.length === 0;
+
+    // 数据量监控：总数来自数据库实时统计，阈值由后端下发
+    const dbCount = data.total_message_count ?? total;
+    $('dbMessageCount').textContent = dbCount.toLocaleString('zh-CN');
+    const threshold = data.warn_threshold ?? 10000;
+    $('storageWarn').classList.toggle('hidden', !(dbCount > threshold));
+
+    if (!items.length) {
+      list.innerHTML = '<div class="py-8 text-center text-[13px] text-ink-300">暂无记录，先上传一段聊天记录吧</div>';
+      return;
+    }
+
+    list.innerHTML = items.map((it) => {
+      const nicks = (it.nicks || []).map((n) => `<span class="px-1.5 py-0.5 rounded bg-brand-50 text-brand-600 border border-brand-100">${escapeHtml(n)}</span>`).join('');
+      const label = it.upload_type === 'file' ? escapeHtml(it.file_name) : `粘贴内容 #${it.id}`;
+      return `
+        <div class="group flex items-center gap-3 px-3.5 py-3 rounded-xl border border-slate-200 hover:border-brand-200 hover:bg-brand-50/30 transition">
+          <span class="shrink-0 w-6 h-6 rounded-lg bg-slate-100 text-ink-500 text-[11.5px] font-semibold grid place-items-center">${it.index}</span>
+          <div class="min-w-0 flex-1">
+            <div class="flex items-center gap-2 min-w-0">
+              <span class="text-[13px] font-medium truncate">${label}</span>
+              <span class="shrink-0 text-[10.5px] px-1.5 py-0.5 rounded ${it.upload_type === 'file' ? 'bg-sky-50 text-sky-600' : 'bg-violet-50 text-violet-600'}">${it.upload_type === 'file' ? '文件' : '粘贴'}</span>
+            </div>
+            <div class="mt-1 flex items-center gap-2 flex-wrap text-[11.5px] text-ink-300">
+              <span>${fmtTime(it.created_at)}</span>
+              <span class="text-slate-300">·</span>
+              <span>${it.message_count} 条</span>
+              ${nicks ? `<span class="text-slate-300">·</span><span class="flex gap-1 flex-wrap">${nicks}</span>` : ''}
+            </div>
+          </div>
+          <button data-del="${it.id}" title="删除此条"
+            class="shrink-0 w-7 h-7 rounded-lg grid place-items-center text-ink-300 hover:bg-rose-50 hover:text-rose-500 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>`;
+    }).join('');
+
+    list.querySelectorAll('[data-del]').forEach((btn) => {
+      btn.addEventListener('click', () => deleteRecord('single', Number(btn.dataset.del)));
+    });
+  }
+
+  async function deleteRecord(type, id) {
+    try {
+      const data = await api('/delete', { method: 'POST', body: JSON.stringify({ delete_type: type, id }) });
+      toast(`已删除 ${data.deleted} 条记录`, 'success');
+      await Promise.all([loadHistory(), loadMerge()]);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+
+  $('btnDeleteLast').addEventListener('click', () => deleteRecord('last'));
+
+  /* ---------------- 删除全部（二次确认） ---------------- */
+  $('btnDeleteAll').addEventListener('click', () => $('confirmModal').classList.remove('hidden'));
+  $('confirmCancel').addEventListener('click', () => $('confirmModal').classList.add('hidden'));
+  $('confirmModal').addEventListener('click', (e) => { if (e.target === $('confirmModal')) $('confirmModal').classList.add('hidden'); });
+  $('confirmOk').addEventListener('click', async () => {
+    $('confirmModal').classList.add('hidden');
+    await deleteRecord('all');
+  });
+
+  /* ---------------- 清理 7 天前数据 ---------------- */
+  $('btnCleanup').addEventListener('click', async () => {
+    const ok = await dialog(
+      '清理 7 天前数据',
+      '此操作将删除 7 天前的所有上传记录和关联消息，不可恢复。是否继续？',
+      '确认清理',
+      true
+    );
+    if (!ok) return;
+    try {
+      toast('正在清理…', 'info');
+      const data = await api('/cleanup', { method: 'POST', body: JSON.stringify({ days: 7 }) });
+      if (!data.deleted) {
+        toast('没有 7 天前的数据，无需清理', 'info');
+      } else {
+        toast(`已清理 ${data.deleted} 条记录、${data.messages_deleted} 条消息`, 'success');
+      }
+      await Promise.all([loadHistory(), loadMerge()]);
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  });
+
+  /* ---------------- 合并预览 ---------------- */
+  async function loadMerge() {
+    const data = await api('/merge');
+    state.messages = data.messages || [];
+    state.nicks = data.nicks || [];
+    renderPreview();
+    autoFillNicks();
+    refreshModeAvailability();
+  }
+
+  function autoFillNicks() {
+    const [a, b] = state.nicks;
+    if (!$('userNick').dataset.edited && a) $('userNick').value = a;
+    if (!$('charNick').dataset.edited && b) $('charNick').value = b;
+
+    if (state.nicks.length === 0) $('nickHint').textContent = '尚未检测到昵称，请先上传聊天记录。';
+    else if (state.nicks.length === 1) $('nickHint').textContent = `仅检测到 1 个昵称（${state.nicks[0]}），请手动补全另一个。`;
+    else if (state.nicks.length > 2) $('nickHint').textContent = `检测到 ${state.nicks.length} 个昵称，已默认填入最常见的两个，可手动修改。`;
+    else $('nickHint').textContent = '已自动填充，可手动修改或点击「互换」调整。';
+  }
+
+  ['userNick', 'charNick'].forEach((id) => {
+    $(id).addEventListener('input', () => { $(id).dataset.edited = '1'; });
+  });
+
+  $('btnSwap').addEventListener('click', () => {
+    const a = $('userNick').value;
+    $('userNick').value = $('charNick').value;
+    $('charNick').value = a;
+    $('userNick').dataset.edited = '1';
+    $('charNick').dataset.edited = '1';
+    renderPreview();
+    toast('已互换 User 与 Char', 'info');
+  });
+  ['userNick', 'charNick'].forEach((id) => $(id).addEventListener('input', renderPreview));
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  }
+
+  function renderPreview() {
+    const box = $('preview');
+    const user = $('userNick').value.trim();
+    const char = $('charNick').value.trim();
+    $('previewCount').textContent = `${state.messages.length} 条`;
+
+    if (!state.messages.length) {
+      box.innerHTML = '<div class="py-8 text-center text-[13px] text-ink-300">暂无对话内容</div>';
+      return;
+    }
+
+    box.innerHTML = state.messages.slice(-300).map((m) => {
+      const isUser = user && m.speaker === user;
+      const isChar = char && m.speaker === char;
+      const cls = isUser
+        ? 'bg-brand-500 text-white'
+        : (isChar ? 'bg-white text-ink-900 border border-slate-200' : 'bg-slate-200 text-ink-700');
+      const nameCls = isUser ? 'text-brand-200' : (isChar ? 'text-ink-300' : 'text-ink-300');
+      return `
+        <div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
+          <div class="max-w-[78%]">
+            <div class="mb-1 text-[11px] ${nameCls} ${isUser ? 'text-right' : ''}">${escapeHtml(m.speaker)}${m.timestamp ? ` · ${escapeHtml(m.timestamp)}` : ''}</div>
+            <div class="bubble px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed shadow-sm ${cls}">${escapeHtml(m.message)}</div>
+          </div>
+        </div>`;
+    }).join('');
+    box.scrollTop = box.scrollHeight;
+  }
+
+  /* ---------------- 数据健康度 ---------------- */
+  const GRADE_COLORS = {
+    A: 'bg-emerald-100 text-emerald-700 border border-emerald-200',
+    B: 'bg-sky-100 text-sky-700 border border-sky-200',
+    C: 'bg-amber-100 text-amber-700 border border-amber-200',
+    D: 'bg-rose-100 text-rose-700 border border-rose-200',
+  };
+  function showHealth(s) {
+    if (!s) return;
+    $('healthCard').classList.remove('hidden');
+    const g = $('healthGrade');
+    g.textContent = `${s.grade} 级 · ${s.score} 分`;
+    g.className = `text-[13px] font-bold px-2.5 py-1 rounded-full ${GRADE_COLORS[s.grade] || ''}`;
+    $('healthValid').textContent = `${(s.valid_ratio * 100).toFixed(0)}%（${s.valid_count}/${s.total}）`;
+    $('barValid').style.width = `${Math.round(s.valid_ratio * 100)}%`;
+    $('healthAlt').textContent = `${(s.alt_ratio * 100).toFixed(0)}%`;
+    $('barAlt').style.width = `${Math.round(s.alt_ratio * 100)}%`;
+    $('healthLen').textContent = `${s.avg_len} 字/条`;
+    $('barLen').style.width = `${Math.min(100, Math.round(s.avg_len / 5 * 100))}%`;
+    $('healthScore').innerHTML = s.score < 60
+      ? '<span class="text-rose-600 font-medium">⚠️ 当前数据质量较低，生成的人格卡可能失真，建议补充更丰富的日常对话。</span>'
+      : '数据可用性良好，可放心生成人格卡。';
+  }
+
+  /* ---------------- 试聊 ---------------- */
+  const chatBox = $('chatBox');
+  let chatMsgs = [];
+  function renderChat() {
+    if (!chatMsgs.length) {
+      chatBox.innerHTML = '<div class="py-6 text-center text-[13px] text-ink-300">生成人格卡后，即可在此与角色对话</div>';
+      return;
+    }
+    chatBox.innerHTML = chatMsgs.map((m) => {
+      const isUser = m.role === 'user';
+      return `
+        <div class="flex ${isUser ? 'justify-end' : 'justify-start'}">
+          <div class="max-w-[80%]">
+            <div class="mb-1 text-[11px] ${isUser ? 'text-right text-brand-500' : 'text-ink-300'}">${isUser ? '你' : '角色'}</div>
+            <div class="bubble px-3.5 py-2.5 rounded-2xl text-[13px] leading-relaxed shadow-sm ${isUser ? 'bg-brand-500 text-white' : 'bg-white text-ink-900 border border-slate-200'}">${escapeHtml(m.content)}</div>
+          </div>
+        </div>`;
+    }).join('');
+    chatBox.scrollTop = chatBox.scrollHeight;
+  }
+  function buildChatSystem() {
+    const d = (state.card && state.card.data) ? state.card.data : {};
+    const personality = d.personality || '';
+    const description = d.description || '';
+    let ex = '';
+    if (Array.isArray(d.mes_example)) ex = d.mes_example.join('\n');
+    else if (typeof d.mes_example === 'string') ex = d.mes_example;
+    return [
+      '请扮演以下角色，严格遵循其人格设定与语气进行回复，保持角色一致性。',
+      '',
+      '【人格特质】', personality,
+      '',
+      '【角色描述】', description,
+      '',
+      '【示例对话】', ex,
+    ].filter((x) => x !== '').join('\n');
+  }
+  $('btnChat').addEventListener('click', async () => {
+    const key = $('apiKey').value.trim();
+    if (!key) return toast('请先输入 DeepSeek API Key', 'warn');
+    if (!key.startsWith('sk-')) return toast('API Key 格式不正确', 'error');
+    if (!state.card) return toast('请先生成人格卡再试聊', 'warn');
+    const text = $('chatInput').value.trim();
+    if (!text) return;
+    chatMsgs.push({ role: 'user', content: text });
+    $('chatInput').value = '';
+    renderChat();
+    const btn = $('btnChat');
+    btn.disabled = true;
+    try {
+      const data = await api('/chat', {
+        method: 'POST',
+        body: JSON.stringify({ api_key: key, system_prompt: buildChatSystem(), messages: chatMsgs }),
+      });
+      chatMsgs.push({ role: 'assistant', content: data.reply });
+      renderChat();
+    } catch (err) {
+      chatMsgs.pop();
+      renderChat();
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+    }
+  });
+  $('chatInput').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); $('btnChat').click(); }
+  });
+
+  /* ---------------- 导出（多格式） ---------------- */
+  const resultCode = () => $('resultJson').querySelector('code');
+  let exportContent = '';
+  let exportFilename = 'character.json';
+
+  async function renderExport() {
+    if (!state.card) return;
+    const fmt = $('exportFormat').value;
+    const data = (state.card && state.card.data) || {};
+    const name = (data.name || 'character').replace(/[\\/:*?"<>|]/g, '_');
+    if (fmt === 'sillytavern') {
+      exportContent = JSON.stringify(state.card, null, 2);
+      exportFilename = `${name}.json`;
+      resultCode().textContent = exportContent;
+      return;
+    }
+    try {
+      const r = await api('/export', { method: 'POST', body: JSON.stringify({ format: fmt, card: state.card }) });
+      exportContent = r.content;
+      exportFilename = r.filename;
+      resultCode().textContent = exportContent;
+    } catch (err) {
+      toast(err.message, 'error');
+    }
+  }
+  $('exportFormat').addEventListener('change', renderExport);
+
+  /* ---------------- 人格保真度 ---------------- */
+  function fidelityColor(s) {
+    if (s >= 85) return 'bg-emerald-500';
+    if (s >= 70) return 'bg-sky-500';
+    if (s >= 60) return 'bg-amber-500';
+    return 'bg-rose-500';
+  }
+  async function runEvaluate() {
+    const key = $('apiKey').value.trim();
+    const fid = $('fidelityCard');
+    const detail = $('fidelityDetail');
+    fid.classList.remove('hidden');
+    $('fidelityRing').className = 'shrink-0 w-16 h-16 rounded-full grid place-items-center text-white text-[18px] font-bold bg-slate-300';
+    $('fidelityRing').textContent = '···';
+    $('fidelityVerdict').textContent = '正在交叉验证（约 10–40 秒）…';
+    detail.classList.add('hidden');
+    if (!key.startsWith('sk-')) {
+      $('fidelityVerdict').textContent = '需填写有效 API Key 才能评估保真度';
+      return;
+    }
+    try {
+      const data = await api('/evaluate_card', {
+        method: 'POST',
+        body: JSON.stringify({
+          api_key: key,
+          user_nick: $('userNick').value.trim(),
+          char_nick: $('charNick').value.trim(),
+          card: state.card,
+          card_id: state.cardId || null,   // 评估得分回写到这张卡
+          mode: state.mode,
+          holdout_ids: state.holdoutIds,
+        }),
+      });
+      const s = data.score;
+      $('fidelityRing').className = `shrink-0 w-16 h-16 rounded-full grid place-items-center text-white text-[18px] font-bold ${fidelityColor(s)}`;
+      $('fidelityRing').textContent = `${s}`;
+
+      const isStrict = data.evaluation_type === 'strict_holdout';
+      const label = isStrict ? '留出验证' : '快速近似估计';
+      const badge = `<span class="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] ${isStrict ? 'bg-emerald-50 text-emerald-600 border border-emerald-200' : 'bg-slate-100 text-ink-500'} mr-2">${label}</span>`;
+      const note = isStrict
+        ? `本次盲测集 ${data.holdout_used ?? ''} 条，评估结果可信度较高`
+        : '如需更严谨的评分，请切换至严谨模式重新生成';
+      $('fidelityVerdict').innerHTML = `${badge}平均保真度 <b>${s}</b> 分 · ${note}`;
+      if (data.score_saved) refreshCardCount();   // 得分已回写，刷新历史列表
+
+      detail.classList.remove('hidden');
+      detail.innerHTML = (data.detail || []).map((c, i) => `
+        <div class="rounded-lg bg-slate-50 px-3 py-2.5">
+          <div class="text-[11px] text-ink-400 mb-1">提问 ${i + 1}：${escapeHtml(c.question || '（无）')}</div>
+          <div class="flex gap-3 text-[12px] text-ink-600">
+            <span>语气 <b>${c.tone}</b></span><span>信息 <b>${c.information}</b></span><span>逻辑 <b>${c.logic}</b></span>
+          </div>
+          ${c.verdict ? `<div class="mt-1 text-[12px] text-ink-500">${escapeHtml(c.verdict)}</div>` : ''}
+        </div>`).join('');
+    } catch (err) {
+      $('fidelityVerdict').textContent = '评估失败：' + err.message;
+    }
+  }
+
+  /* ---------------- 生成人格卡 ---------------- */
+  $('btnGenerate').addEventListener('click', async () => {
+    const key = $('apiKey').value.trim();
+    if (!key) return toast('请先输入 DeepSeek API Key', 'warn');
+    if (!key.startsWith('sk-')) return toast('API Key 格式不正确（应以 sk- 开头）', 'error');
+    if (!state.messages.length) return toast('暂无对话内容，请先上传聊天记录', 'warn');
+
+    const user = $('userNick').value.trim();
+    const char = $('charNick').value.trim();
+    if (!user || !char) return toast('请补全 User 与 Char 的昵称', 'warn');
+    if (user === char) return toast('User 与 Char 昵称不能相同', 'error');
+
+    const btn = $('btnGenerate');
+    btn.disabled = true;
+    $('genText').textContent = '生成中…（约 20-60 秒）';
+    $('genIcon').innerHTML = '<svg class="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="3"></circle><path class="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8v3a5 5 0 00-5 5H4z"></path></svg>';
+
+    try {
+      const data = await api('/generate_card', {
+        method: 'POST',
+        body: JSON.stringify({ api_key: key, user_nick: user, char_nick: char, messages: state.messages, mode: state.mode }),
+      });
+      state.card = data.card;
+      state.cardId = data.card_id || null;
+      state.holdoutIds = data.holdout_ids || [];
+      if (data.fallback_reason) toast(data.fallback_reason, 'warn');
+      $('resultWrap').classList.remove('hidden');
+      $('resultBadge').classList.remove('hidden');
+      $('exportFormat').value = 'sillytavern';
+      await renderExport();
+      refreshCardCount();
+      toast(data.card_id ? `人格卡生成成功，已保存 #${data.card_id}` : '人格卡生成成功', 'success');
+      $('resultWrap').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      runEvaluate();
+    } catch (err) {
+      toast(err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      $('genText').textContent = '生成人格卡';
+      $('genIcon').innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.8 4.6A2 2 0 0113.4 6l.3 4.2 4.2.3a2 2 0 011.4 3.6l-3.2 2.8 1 4.2a2 2 0 01-3 2.2l-3.7-2.2-3.7 2.2a2 2 0 01-3-2.2l1-4.2L1.5 14a2 2 0 011.4-3.6l4.2-.3.3-4.2a2 2 0 012.4-1.3z"/></svg>';
+    }
+  });
+
+  $('btnCopy').addEventListener('click', async () => {
+    if (!exportContent) return;
+    try {
+      await navigator.clipboard.writeText(exportContent);
+      toast('已复制到剪贴板', 'success');
+    } catch {
+      const ta = document.createElement('textarea');
+      ta.value = exportContent; document.body.appendChild(ta); ta.select();
+      document.execCommand('copy'); ta.remove();
+      toast('已复制到剪贴板', 'success');
+    }
+  });
+
+  $('btnDownload').addEventListener('click', () => {
+    if (!exportContent) return;
+    const isJson = exportFilename.endsWith('.json');
+    const mime = isJson ? 'application/json;charset=utf-8' : 'text/markdown;charset=utf-8';
+    const blob = new Blob([exportContent], { type: mime });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = exportFilename;
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+    toast('已开始下载', 'success');
+  });
+
+  /* ---------------- 初始化 ---------------- */
+  (async () => {
+    try { await Promise.all([loadHistory(), loadMerge()]); syncModeUI(); }
+    catch (err) { toast(err.message, 'error'); }
+    refreshCardCount();
+  })();
+})();
+</script>
+</body>
+</html>
