@@ -5,6 +5,10 @@
   <img src="https://img.shields.io/badge/status-stable-brightgreen?style=for-the-badge" alt="Status" />
 </p>
 
+<div align="center">
+  <b>中文</b> · <a href="README_EN.md">English</a>
+</div>
+
 # 🎭 人格卡生成工具（Chara Card Generator）
 
 > **基于聊天记录一键生成 AI 人格卡** —— 把一段真实的对话，变成一张有语气、有性格、有记忆的虚拟角色卡。
